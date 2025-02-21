@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Maverick Chaiwala</title>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; }
+        #pourButton, #drinkButton {
+            position: absolute;
+            bottom: 20%;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-right: 10px;
+            background-color: #2C3E50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        #pourButton:hover, #drinkButton:hover {
+            background-color: #34495E;
+        }
+        #pourButton {
+            left: 44%;
+        }
+        #drinkButton {
+            left: 52%;
+        }
+    </style>
+</head>
+<body>
+    <button id="pourButton">Pour Tea</button>
+    <button id="drinkButton">Drink</button>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+    <script>
+        let scene, camera, renderer, teapot, cup, liquid, teaStream;
+        let isPouring = false;
+        let initialTeapotPosition = { x: -1, y: -0.55, z: -0.5 };
+        let initialTeapotRotation = { z: 0 };
+        let liquidLevel = -0.2;
+
+        function init() {
+            scene = new THREE.Scene();
+            
+            // Configure renderer with shadows
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.body.appendChild(renderer.domElement);
+
+            // Updated wall color - warm gray
+            const wallGeometry = new THREE.BoxGeometry(20, 10, 0.1);
+            const wallMaterial = new THREE.MeshPhongMaterial({ color: 0xE0E0f8 });
+            const backWall = new THREE.Mesh(wallGeometry, wallMaterial);
+            backWall.position.set(0, 2, -5);
+            backWall.receiveShadow = true;
+            scene.add(backWall);
+
+            // Side wall with same color
+            const sideWall = new THREE.Mesh(wallGeometry, wallMaterial);
+            sideWall.rotation.y = Math.PI / 2;
+            sideWall.position.set(-8, 2, 0);
+            sideWall.receiveShadow = true;
+            scene.add(sideWall);
+
+            // Updated floor color - darker wood
+            const floorGeometry = new THREE.PlaneGeometry(20, 20);
+            const floorMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0x2C3E50,
+                side: THREE.DoubleSide 
+            });
+            const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+            floor.rotation.x = Math.PI / 2;
+            floor.position.y = -2;
+            floor.receiveShadow = true;
+            scene.add(floor);
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+            // Updated lighting for shadows
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(5, 5, 5);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 1024;
+            directionalLight.shadow.mapSize.height = 1024;
+            directionalLight.shadow.camera.near = 0.5;
+            directionalLight.shadow.camera.far = 500;
+            scene.add(directionalLight);
+
+            const spotLight = new THREE.SpotLight(0xE6D5AC, 0.6);
+            spotLight.position.set(2, 5, 2);
+            spotLight.angle = Math.PI / 4;
+            spotLight.castShadow = true;
+            spotLight.shadow.mapSize.width = 1024;
+            spotLight.shadow.mapSize.height = 1024;
+            scene.add(spotLight);
+
+            // Updated table with shadows
+            const tableGeometry = new THREE.BoxGeometry(4, 0.2, 3);
+            const tableMaterial = new THREE.MeshPhongMaterial({ color: 0x7a4e20 });
+            const table = new THREE.Mesh(tableGeometry, tableMaterial);
+            table.position.set(0, -1.2, 0);
+            table.castShadow = true;
+            table.receiveShadow = true;
+            scene.add(table);
+
+            // table legs with shadows
+            const legGeometry = new THREE.CylinderGeometry(0.05, 0.05, 3, 20);
+            const legMaterial = new THREE.MeshPhongMaterial({ color: 0x7a4e20 });
+
+            const tableWidth = 3, tableDepth = 2.5;
+            const legOffsetX = tableWidth / 2 - 0.1;
+            const legOffsetZ = tableDepth / 2 - 0.1;
+            const legY = -2.9;
+
+            const legPositions = [
+                [-legOffsetX, legY, -legOffsetZ],
+                [ legOffsetX, legY, -legOffsetZ],
+                [-legOffsetX, legY,  legOffsetZ],
+                [ legOffsetX, legY,  legOffsetZ]
+            ];
+
+            for (const [x, y, z] of legPositions) {
+                let leg = new THREE.Mesh(legGeometry, legMaterial);
+                leg.position.set(x, y, z);
+                leg.castShadow = true;
+                leg.receiveShadow = true;
+                scene.add(leg);
+            }
+
+            // Updated teapot with shadows
+            teapot = new THREE.Group();
+            const bodyGeometry = new THREE.SphereGeometry(0.4, 32, 32);
+            const bodyMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0xC0392B,
+                metalness: 0.7,
+                roughness: 0.3
+            });
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.castShadow = true;
+            teapot.add(body);
+
+            const topBottomGeometry = new THREE.CylinderGeometry(0.4, 0.4, 0.1, 32);
+            const top = new THREE.Mesh(topBottomGeometry, bodyMaterial);
+            top.position.y = 0.45;
+            top.castShadow = true;
+            teapot.add(top);
+
+            const bottom = new THREE.Mesh(topBottomGeometry, bodyMaterial);
+            bottom.position.y = -0.45;
+            bottom.castShadow = true;
+            teapot.add(bottom);
+
+            const lidGeometry = new THREE.CylinderGeometry(0.3, 0.3, 0.05, 32);
+            const lid = new THREE.Mesh(lidGeometry, bodyMaterial);
+            lid.position.y = 0.5;
+            lid.castShadow = true;
+            teapot.add(lid);
+
+            const handleGeometry = new THREE.TorusGeometry(0.2, 0.05, 16, 100);
+            const handle = new THREE.Mesh(handleGeometry, bodyMaterial);
+            handle.position.set(-0.5, 0, 0);
+            handle.castShadow = true;
+            teapot.add(handle);
+
+            const spoutCurve = new THREE.CurvePath();
+            spoutCurve.add(new THREE.LineCurve3(new THREE.Vector3(0.4, 0.1, 0), new THREE.Vector3(0.5, 0.2, 0)));
+            spoutCurve.add(new THREE.LineCurve3(new THREE.Vector3(0.5, 0.2, 0), new THREE.Vector3(0.6, 0.25, 0)));
+            const spoutGeometry = new THREE.TubeGeometry(spoutCurve, 20, 0.05, 8, false);
+            const spout = new THREE.Mesh(spoutGeometry, bodyMaterial);
+            spout.castShadow = true;
+            teapot.add(spout);
+
+            teapot.position.set(initialTeapotPosition.x, initialTeapotPosition.y, initialTeapotPosition.z);
+            scene.add(teapot);
+
+            // Updated cup with shadows
+            cup = new THREE.Group();
+            const cupGeometry = new THREE.CylinderGeometry(0.3, 0.3, 0.5, 32);
+            const cupMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0xBDC0C1, 
+                transparent: true, 
+                opacity: 0.5 
+            });
+            const cupBody = new THREE.Mesh(cupGeometry, cupMaterial);
+            cupBody.castShadow = true;
+            cupBody.receiveShadow = true;
+            cup.add(cupBody);
+
+            const cupHandleGeometry = new THREE.TorusGeometry(0.1, 0.03, 16, 100);
+            const cupHandle = new THREE.Mesh(cupHandleGeometry, cupMaterial);
+            cupHandle.position.set(0.3, 0, 0);
+            cupHandle.castShadow = true;
+            cup.add(cupHandle);
+
+            liquid = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.29, 0.29, 0.01, 32),
+                new THREE.MeshPhongMaterial({ color: 0x6F370F })
+            );
+            liquid.position.y = liquidLevel;
+            cup.add(liquid);
+
+            cup.position.set(1, -0.85, 0);
+            scene.add(cup);
+
+            // Updated tea stream with shadows
+            teaStream = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.02, 0.05, 0.25, 8),
+                new THREE.MeshPhongMaterial({ color: 0x8B4513 })
+            );
+            teaStream.position.set(0.98, -0.5, 0);
+            teaStream.visible = false;
+            teaStream.castShadow = true;
+            scene.add(teaStream);
+
+            camera.position.set(0, 2, 5);
+            camera.lookAt(0, 0, 0);
+        }
+
+        function pourTea() {
+            if (isPouring) return;
+            isPouring = true;
+
+            new TWEEN.Tween(teapot.position)
+                .to({ x: 0.4 }, 1000)
+                .easing(TWEEN.Easing.Quadratic.Out)
+                .start();
+
+            new TWEEN.Tween(teapot.rotation)
+                .to({ z: -Math.PI / 6 }, 1000)
+                .easing(TWEEN.Easing.Quadratic.Out)
+                .start()
+                .onComplete(() => {
+                    teaStream.visible = true;
+                    new TWEEN.Tween(liquid.position)
+                        .to({ y: liquidLevel + 0.2 }, 2000)
+                        .easing(TWEEN.Easing.Quadratic.Out)
+                        .start()
+                        .onComplete(() => {
+                            teaStream.visible = false;
+                            new TWEEN.Tween(teapot.rotation)
+                                .to(initialTeapotRotation, 1000)
+                                .easing(TWEEN.Easing.Quadratic.Out)
+                                .start()
+                                .onComplete(() => {
+                                    new TWEEN.Tween(teapot.position)
+                                        .to(initialTeapotPosition, 1000)
+                                        .easing(TWEEN.Easing.Quadratic.Out)
+                                        .start();
+                                });
+                        });
+                });
+        }
+
+        function drinkTea() {
+            if (!isPouring) return;
+            isPouring = false;
+
+            new TWEEN.Tween(liquid.position)
+                .to({ y: liquidLevel }, 1500)
+                .easing(TWEEN.Easing.Quadratic.Out)
+                .start();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            TWEEN.update();
+            renderer.render(scene, camera);
+        }
+
+        document.getElementById("pourButton").addEventListener("click", pourTea);
+        document.getElementById("drinkButton").addEventListener("click", drinkTea);
+
+        init();
+        animate();
+    </script>
+</body>
+</html>
