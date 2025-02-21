@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Enhanced 3D Water Fountain</title>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; }
+        #controls {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+        }
+        .control-group {
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <div class="control-group">
+            <label for="pressure">Water Pressure: </label>
+            <input type="range" id="pressure" min="1" max="100" value="50">
+        </div>
+        <div class="control-group">
+            <label for="style">Fountain Style: </label>
+            <select id="style">
+                <option value="modern">Modern</option>
+                <option value="classic">Classic</option>
+                <option value="animated">Animated</option>
+                <option value="spiral">Spiral</option>
+                <option value="cascade">Cascade</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label for="pattern">Water Pattern: </label>
+            <select id="pattern">
+                <option value="circular">Circular</option>
+                <option value="star">Star</option>
+                <option value="random">Random</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label for="nightMode">Night Mode: </label>
+            <input type="checkbox" id="nightMode">
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Scene setup
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB);
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(5, 10, 5);
+        directionalLight.castShadow = true;
+        scene.add(directionalLight);
+
+        const spotlight = new THREE.SpotLight(0xffffff, 1);
+        spotlight.position.set(0, 10, 0);
+        spotlight.angle = Math.PI / 4;
+        spotlight.penumbra = 0.1;
+        spotlight.decay = 2;
+        spotlight.distance = 200;
+        spotlight.castShadow = true;
+        spotlight.visible = false;
+        scene.add(spotlight);
+
+        // Ground
+        const groundGeometry = new THREE.CircleGeometry(20, 32);
+        const groundMaterial = new THREE.MeshPhongMaterial({ color: 0x3a9d23 });
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.y = -0.5;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // Fixed tree creation function
+        function createTree(x, z, scale = 1) {
+            const group = new THREE.Group();
+            
+            // Trunk
+            const trunkGeometry = new THREE.CylinderGeometry(0.2 * scale, 0.3 * scale, 1.5 * scale, 8);
+            const trunkMaterial = new THREE.MeshPhongMaterial({ color: 0x4d2926 });
+            const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+            trunk.castShadow = true;
+            trunk.position.y = 0.75 * scale;
+            group.add(trunk);
+            
+            // Leaves
+            const leavesGeometry = new THREE.ConeGeometry(1 * scale, 2 * scale, 8);
+            const leavesMaterial = new THREE.MeshPhongMaterial({ color: 0x0f5d1a });
+            
+            const leaves1 = new THREE.Mesh(leavesGeometry, leavesMaterial);
+            leaves1.position.y = 2.25 * scale;
+            leaves1.castShadow = true;
+            group.add(leaves1);
+            
+            const leaves2 = new THREE.Mesh(leavesGeometry, leavesMaterial);
+            leaves2.position.y = 2.75 * scale;
+            leaves2.scale.set(0.8, 0.8, 0.8);
+            leaves2.castShadow = true;
+            group.add(leaves2);
+            
+            group.position.set(x, 0, z);
+            return group;
+        }
+
+        // Fixed bush creation function
+        function createBush(x, z, scale = 1) {
+    const group = new THREE.Group();
+    
+    // Create multiple spheres with slight variations in size and position
+    const sphereCount = 8;
+    const baseColor = new THREE.Color(0x1d8a32);
+    
+    for (let i = 0; i < sphereCount; i++) {
+        // Vary the size of each sphere segment
+        const size = (0.4 + Math.random() * 0.3) * scale;
+        const bushGeometry = new THREE.SphereGeometry(size, 8, 8);
+        
+        // Create slight variations in the green color
+        const colorVariation = 0.1;
+        const bushMaterial = new THREE.MeshPhongMaterial({
+            color: new THREE.Color(
+                baseColor.r + (Math.random() - 0.5) * colorVariation,
+                baseColor.g + (Math.random() - 0.5) * colorVariation,
+                baseColor.b + (Math.random() - 0.5) * colorVariation
+            )
+        });
+        
+        const bushPart = new THREE.Mesh(bushGeometry, bushMaterial);
+        
+        // Position each sphere segment with slight offsets
+        bushPart.position.set(
+            (Math.random() - 0.5) * 0.5 * scale,
+            (0.3 + Math.random() * 0.4) * scale,
+            (Math.random() - 0.5) * 0.5 * scale
+        );
+        
+        bushPart.castShadow = true;
+        group.add(bushPart);
+    }
+    
+    // Add some smaller spheres at the bottom for a fuller look
+    for (let i = 0; i < 4; i++) {
+        const size = 0.3 * scale;
+        const bushGeometry = new THREE.SphereGeometry(size, 8, 8);
+        const bushMaterial = new THREE.MeshPhongMaterial({
+            color: new THREE.Color(
+                baseColor.r - 0.1,
+                baseColor.g - 0.1,
+                baseColor.b - 0.1
+            )
+        });
+        
+        const bushPart = new THREE.Mesh(bushGeometry, bushMaterial);
+        bushPart.position.set(
+            (Math.random() - 0.5) * 0.6 * scale,
+            0.2 * scale,
+            (Math.random() - 0.5) * 0.6 * scale
+        );
+        
+        bushPart.castShadow = true;
+        group.add(bushPart);
+    }
+    
+    group.position.set(x, 0, z);
+    return group;
+}
+
+        // Create trees and bushes
+        const trees = [];
+        const treePositions = [
+            [-8, -8, 1.2],
+            [8, -8, 1.5],
+            [-10, 5, 1.3],
+            [10, 5, 1.4]
+        ];
+
+        treePositions.forEach(pos => {
+            const tree = createTree(pos[0], pos[1], pos[2]);
+            trees.push(tree);
+            scene.add(tree);
+        });
+
+        const bushPositions = [
+            [-4, -4, 1],
+            [4, -4, 1.2],
+            [-5, 3, 0.8],
+            [5, 3, 1],
+            [0, -5, 0.9]
+        ];
+
+        bushPositions.forEach(pos => {
+            const bush = createBush(pos[0], pos[1], pos[2]);
+            scene.add(bush);
+        });
+
+        // Rest of the fountain code remains the same...
+        const fountainGeometry = new THREE.CylinderGeometry(2, 2.5, 1, 32);
+        const fountainMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0xFFFFFF,
+            metalness: 0.8,
+            roughness: 0.2
+        });
+        const fountain = new THREE.Mesh(fountainGeometry, fountainMaterial);
+        fountain.castShadow = true;
+        scene.add(fountain);
+
+        // Water pool
+        const poolGeometry = new THREE.CylinderGeometry(3, 3, 0.2, 32);
+        const poolMaterial = new THREE.MeshPhongMaterial({ 
+            color: 0x000000,
+            transparent: true,
+            opacity: 0.8,
+            shininess: 90
+        });
+        const pool = new THREE.Mesh(poolGeometry, poolMaterial);
+        pool.position.y = -0.5;
+        pool.receiveShadow = true;
+        scene.add(pool);
+
+        // Particle system
+        const particleCount = 2000;
+        const particles = new THREE.BufferGeometry();
+        const positions = new Float32Array(particleCount * 3);
+        const velocities = [];
+        let pattern = 'circular';
+
+        function initializeParticles() {
+            for (let i = 0; i < particleCount; i++) {
+                positions[i * 3] = 0;
+                positions[i * 3 + 1] = 0.5;
+                positions[i * 3 + 2] = 0;
+                velocities[i] = calculateVelocity(i);
+            }
+        }
+
+        function calculateVelocity(index) {
+            let vx, vy, vz;
+            switch(pattern) {
+                case 'star':
+                    const angle = (index / particleCount) * Math.PI * 2;
+                    vx = Math.cos(angle) * 0.3;
+                    vy = Math.random() * 0.5 + 0.5;
+                    vz = Math.sin(angle) * 0.3;
+                    break;
+                case 'random':
+                    vx = (Math.random() - 0.5) * 0.6;
+                    vy = Math.random() * 0.5 + 0.5;
+                    vz = (Math.random() - 0.5) * 0.6;
+                    break;
+                default: // circular
+                    const radius = 0.3;
+                    const theta = Math.random() * Math.PI * 2;
+                    vx = Math.cos(theta) * radius;
+                    vy = Math.random() * 0.5 + 0.5;
+                    vz = Math.sin(theta) * radius;
+            }
+            return { x: vx, y: vy, z: vz };
+        }
+
+        initializeParticles();
+        particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        
+        const particleMaterial = new THREE.PointsMaterial({
+            color: 0x0000FF,
+            size: 0.05,
+            transparent: true,
+            opacity: 0.8
+        });
+
+        const particleSystem = new THREE.Points(particles, particleMaterial);
+        scene.add(particleSystem);
+
+        // Camera setup
+        camera.position.set(0, 8, 15);
+        camera.lookAt(0, 0, 0);
+
+        // Animation variables
+        let pressure = 50;
+        let currentStyle = 'modern';
+        let isNightMode = false;
+
+        // Controls
+        document.getElementById('pressure').addEventListener('input', (e) => {
+            pressure = e.target.value;
+        });
+
+        document.getElementById('style').addEventListener('change', (e) => {
+            currentStyle = e.target.value;
+            updateFountainStyle();
+        });
+
+        document.getElementById('pattern').addEventListener('change', (e) => {
+            pattern = e.target.value;
+            initializeParticles();
+        });
+
+        document.getElementById('nightMode').addEventListener('change', (e) => {
+            isNightMode = e.target.checked;
+            updateNightMode();
+        });
+
+        function updateNightMode() {
+            if (isNightMode) {
+                scene.background = new THREE.Color(0x000033);
+                ambientLight.intensity = 0.1;
+                directionalLight.intensity = 0.2;
+                spotlight.visible = true;
+                fountainMaterial.emissive = new THREE.Color(0x202020);
+            } else {
+                scene.background = new THREE.Color(0x87CEEB);
+                ambientLight.intensity = 0.6;
+                directionalLight.intensity = 0.8;
+                spotlight.visible = false;
+                fountainMaterial.emissive = new THREE.Color(0x000000);
+            }
+        }
+
+        function updateFountainStyle() {
+            switch(currentStyle) {
+                case 'modern':
+                    fountain.geometry = new THREE.CylinderGeometry(2, 2.5, 1, 32);
+                    break;
+                case 'classic':
+                    fountain.geometry = new THREE.CylinderGeometry(1.5, 2.5, 1.5, 32);
+                    break;
+                case 'animated':
+                    fountain.geometry = new THREE.CylinderGeometry(2, 2.5, 1 + Math.sin(Date.now() * 0.001) * 0.2, 32);
+                    break;
+                case 'spiral':
+                    fountain.geometry = new THREE.CylinderGeometry(1.5, 2.5, 2, 32, 1, true, 0, Math.PI * 1.5);
+                    break;
+                case 'cascade':
+                    fountain.geometry = new THREE.CylinderGeometry(2, 3, 1.5, 32, 3, true);
+                    break;
+            }
+        }
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Update particles
+            const positions = particles.attributes.position.array;
+            for (let i = 0; i < particleCount; i++) {
+                velocities[i].y -= 0.02;
+                positions[i * 3] += velocities[i].x * (pressure / 50);
+                positions[i * 3 + 1] += velocities[i].y * (pressure / 50);
+                positions[i * 3 + 2] += velocities[i].z * (pressure / 50);
+
+                if (positions[i * 3 + 1] < -0.5) {
+                    positions[i * 3] = 0;
+                    positions[i * 3 + 1] = 0.5;
+                    positions[i * 3 + 2] = 0;
+                    velocities[i] = calculateVelocity(i);
+                }
+            }
+
+            particles.attributes.position.needsUpdate = true;
+
+            if (currentStyle === 'animated') {
+                updateFountainStyle();
+            }
+
+            // Gentle tree movement
+            trees.forEach((tree, index) => {
+                tree.rotation.x = Math.sin(Date.now() * 0.001 + index) * 0.02;
+                tree.rotation.z = Math.cos(Date.now() * 0.001 + index) * 0.02;
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>
+
+
