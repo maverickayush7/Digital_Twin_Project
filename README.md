@@ -26,7 +26,7 @@ Features:
 
 ----------------------------------------------------------------------
 
-How to run?
+Steps to run ?
 1) Clone the repo
 2) Download the Live Server extension in VS code
 3) Right click on the .html file " Select > Open with Live Server"
