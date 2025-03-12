@@ -1,6 +1,6 @@
 # Digital_Twin_Project
 
-3D_teapour.html
+## 3D_teapour.html
 
 Creates a 3D tea-making simulation using Three.js and Tween.js, featuring a teapot, a cup, and an interactive pouring and drinking mechanism. 
 The scene is set on a wooden table with realistic lighting, shadows, and background elements.
@@ -14,7 +14,7 @@ Features:
 
 ----------------------------------------------------------------------
 
-3D_fountain.html
+## 3D_fountain.html
 
 Interactive 3D water fountain features a customizable water jet system, fountain styles, and particle effects to simulate realistic water flow. The environment includes trees, bushes, and lighting effects to enhance visual appeal.
 
